@@ -1,0 +1,8 @@
+fastapi
+sqlalchemy
+passlib
+jose
+python-dotenv
+google-cloud-storage
+pydantic
+psycopg2-binary 
