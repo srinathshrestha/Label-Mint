@@ -24,12 +24,13 @@ class UserTask(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"))
-    status = Column(String(20), nullable=False, default="pending")  # "pending", "completed", "reviewed"
+    status = Column(String(20), nullable=False, default="pending") 
     labeled_data = Column(JSON)
     submitted_at = Column(DateTime)
-    review_status = Column(String(20), nullable=False, default="pending")  # "pending", "approved", "rejected"
+    review_status = Column(String(20), nullable=False, default="pending") 
     feedback = Column(Text)
-    resubmitted_count = Column(Integer, default=0)
+    submission_counter = Column(Integer, default=0)
+    assigned_at = Column(DateTime, default=func.now())
 
     # Relationships to User and Task
     user = relationship("User", back_populates="user_tasks")
