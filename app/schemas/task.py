@@ -8,11 +8,13 @@ class TaskCreate(BaseModel):
     description: Optional[str] = None
     image_url: Optional[str] = None
     type: str  # "classification" or "object_detection"
+    token_reward: int
 
+    
 class TaskResponse(BaseModel):
     id: int
     task_id: int
-    user_id: int
+    user_id: Optional [int] = None
     status: str
     title: str
     description: str

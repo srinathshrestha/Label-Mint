@@ -29,6 +29,7 @@ class UserTask(Base):
     submitted_at = Column(DateTime)
     review_status = Column(String(20), nullable=False, default="pending")  # "pending", "approved", "rejected"
     feedback = Column(Text)
+    resubmitted_count = Column(Integer, default=0)
 
     # Relationships to User and Task
     user = relationship("User", back_populates="user_tasks")

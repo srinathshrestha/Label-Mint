@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from app.models import User, Task, UserTask,Token
+from app.schemas.task import TaskCreate, TaskResponse
 from app.services.token_service import issue_tokens_to_user
 from typing import List
 from app.models import Task, UserTask, User
@@ -12,7 +13,7 @@ def get_all_users(db: Session):
     users = db.query(User).all()
     return users
 
-def create_task(db: Session, task_data):
+def create_task(db: Session, task_data: TaskCreate) -> TaskResponse:
     new_task = Task(
         title=task_data.title,
         description=task_data.description,
@@ -23,7 +24,19 @@ def create_task(db: Session, task_data):
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
-    return new_task
+
+    # Convert to TaskResponse schema
+    return TaskResponse(
+        id=new_task.id,
+        task_id=new_task.id,  # Assuming task_id is the same as the task's primary key
+        user_id=None,         # No user assigned yet
+        status="unassigned",  # Default status for a new task
+        title=new_task.title,
+        description=new_task.description,
+        image_url=new_task.image_url,
+        type=new_task.type,
+        created_at=new_task.created_at
+    )
 
 def edit_task(db: Session, task_id: int, task_data):
     task = db.query(Task).filter(Task.id == task_id).first()

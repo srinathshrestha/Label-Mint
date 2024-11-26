@@ -15,19 +15,19 @@ from app.services.task_service import (
 
 router = APIRouter()
 
-@router.get("/tasks/", response_model=List[MinimalTaskResponse])
+@router.get("/", response_model=List[MinimalTaskResponse])
 def view_tasks(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     return view_unassigned_tasks(db)
 
-@router.get("/task/{task_id}/", response_model=TaskDetailResponse)
+@router.get("/{task_id}/", response_model=TaskDetailResponse)
 def view_task(task_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     return view_task_detail(db, task_id)
 
-@router.post("/task/{task_id}/confirm", response_model=UserTaskResponse)
+@router.post("/{task_id}/confirm", response_model=UserTaskResponse)
 def confirm_user_task(task_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     return confirm_task(db, task_id, current_user.id)
 
-@router.post("/task/{task_id}/submit", response_model=UserTaskResponse)
+@router.post("/{task_id}/submit", response_model=UserTaskResponse)
 def submit_user_task(task_id: int, submission: TaskSubmissionSchema, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     return submit_task(db, task_id, submission, current_user)
 
