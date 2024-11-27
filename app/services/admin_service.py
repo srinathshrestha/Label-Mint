@@ -1,11 +1,19 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from app.models import User, Task, UserTask,Token
-from app.schemas.task import TaskCreate, TaskResponse
 from app.services.token_service import issue_tokens_to_user
 from typing import List
 from app.models import Task, UserTask, User
-from app.schemas import TaskResponseWithUser,AdminReviewAction,TaskSubmissionResponse, TaskInfo, UserInfo
+from app.schemas import (
+    TaskCreate,
+    TaskResponse,
+    TaskResponseWithUser,
+    AdminReviewAction,
+    TaskSubmissionResponse,
+    TaskInfo,
+    UserInfo,
+    UserResponse
+)
 
 
 
@@ -79,13 +87,50 @@ def delete_task(db: Session, task_id: int):
 
 def view_all_tasks(db: Session) -> List[TaskResponseWithUser]:
     tasks = db.query(Task).all()
-    return [
-        {
-            "task": task,
-            "assigned_user": db.query(User).filter(User.id == user_task.user_id).first() if (user_task := db.query(UserTask).filter(UserTask.task_id == task.id).first()) else None
-        }
-        for task in tasks
-    ]
+    response_list = []
+
+    for task in tasks:
+        # Fetch the UserTask entry if it exists
+        user_task = db.query(UserTask).filter(UserTask.task_id == task.id).first()
+
+        if user_task:
+            status = user_task.status
+            user_id = user_task.user_id
+            # Fetch the assigned user
+            assigned_user = db.query(User).filter(User.id == user_task.user_id).first()
+            assigned_user_response = UserResponse(
+                id=assigned_user.id,
+                username=assigned_user.username,
+                email=assigned_user.email,
+                profile_picture=assigned_user.profile_picture,
+                role=assigned_user.role,
+                created_at=assigned_user.created_at
+            )
+        else:
+            status = "unassigned"
+            user_id = None
+            assigned_user_response = None
+
+        # Create TaskResponse object with all required fields
+        task_response = TaskResponse(
+            id=task.id,
+            user_id=user_id,
+            status=status,
+            title=task.title,
+            description=task.description,
+            image_url=task.image_url,
+            type=task.type,
+            created_at=task.created_at
+        )
+
+        # Append to the response list
+        response_list.append(TaskResponseWithUser(
+            task=task_response,
+            assigned_user=assigned_user_response
+        ))
+
+    return response_list
+
 
 
 

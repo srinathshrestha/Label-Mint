@@ -26,30 +26,30 @@ from app.models.user import User
 
 router = APIRouter()
 
-@router.get("/admin/users/", response_model=List[UserResponse])
+@router.get("/users/", response_model=List[UserResponse])
 def admin_get_all_users(db: Session = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
     return get_all_users(db)
 
-@router.post("/admin/tasks/create", response_model=TaskResponse)
+@router.post("/tasks/create", response_model=TaskResponse)
 def admin_create_task(task_data: TaskCreate, db: Session = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
     return create_task(db, task_data)
 
-@router.put("/admin/tasks/{task_id}/edit", response_model=TaskResponse)
+@router.put("/tasks/{task_id}/edit", response_model=TaskResponse)
 def admin_edit_task(task_id: int, task_data: TaskCreate, db: Session = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
     return edit_task(db, task_id, task_data)
 
-@router.delete("/admin/tasks/{task_id}/delete", response_model=dict)
+@router.delete("/tasks/{task_id}/delete", response_model=dict)
 def admin_delete_task(task_id: int, db: Session = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
     return delete_task(db, task_id)
 
-@router.get("/admin/tasks/", response_model=List[TaskResponseWithUser])
+@router.get("/tasks/", response_model=List[TaskResponseWithUser])
 def admin_view_all_tasks(db: Session = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
     return view_all_tasks(db)
 
-@router.get("/admin/submissions/", response_model=List[TaskSubmissionResponse])
+@router.get("/submissions/", response_model=List[TaskSubmissionResponse])
 def admin_view_all_completed_submissions(db: Session = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
     return view_all_completed_submissions(db)
 
-@router.post("/admin/submissions/{submission_id}/review", response_model=TaskSubmissionResponse)
+@router.post("/submissions/{submission_id}/review", response_model=TaskSubmissionResponse)
 def admin_review_submission(submission_id: int, review_action: AdminReviewAction, db: Session = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
     return review_submission_action(db, submission_id, review_action)

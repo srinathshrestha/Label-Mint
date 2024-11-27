@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 import os
 from dotenv import load_dotenv
-from app.schemas.token import TokenData
+from app.schemas import TokenData
 from typing import Optional
 
 # Load environment variables

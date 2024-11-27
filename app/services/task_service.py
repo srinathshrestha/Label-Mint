@@ -2,12 +2,19 @@ from sqlalchemy.orm import Session
 from app.models import Task, UserTask
 from fastapi import HTTPException, status
 from app.models.user import User
-from app.schemas import TaskDetailResponse,TaskResponse,TaskResponse
 from datetime import datetime
 from app.models import Task, UserTask,Token
-from app.schemas import TaskSubmissionSchema, TaskSubmissionResponse
-from app.schemas.task import MinimalTaskResponse, TaskInfo, UserInfo
-from app.schemas import UserTaskResponse
+from app.schemas import (
+    TaskDetailResponse,
+    TaskResponse,
+    MinimalTaskResponse,
+    TaskSubmissionSchema,
+    TaskSubmissionResponse,
+    UserTaskResponse,
+    TaskInfo,
+    UserInfo
+)
+
 
 
 # Add any additional task-related functions here, with local imports as needed
@@ -73,7 +80,7 @@ def drop_task(db: Session, task_id: int, user_id: int):
     db.delete(user_task)
     db.commit()
     return {"message": "Task dropped"}
-def confirm_task(db: Session, task_id: int, user_id: int) -> TaskResponse:
+def confirm_task(db: Session, task_id: int, user_id: int) -> UserTaskResponse:
     """
     Mark a task as confirmed by a specific user.
     """
@@ -99,23 +106,22 @@ def confirm_task(db: Session, task_id: int, user_id: int) -> TaskResponse:
     db.refresh(new_user_task)  # Refresh to ensure we have an ID for the new_user_task
 
     # Return TaskResponse with all required fields
-    return TaskResponse(
-        id=new_user_task.id,  # The ID of the UserTask instance
-        task_id=task.id,
-        user_id=user_id,
+    return UserTaskResponse(
+        id=new_user_task.id,
+        task_id=new_user_task.task_id,
+        user_id=new_user_task.user_id,
         status=new_user_task.status,
-        title=task.title,
-        description=task.description,
-        image_url=task.image_url,
-        type=task.type,
-        created_at=task.created_at
+        labeled_data=new_user_task.labeled_data,
+        submitted_at=new_user_task.submitted_at,
+        review_status=new_user_task.review_status,
+        feedback=new_user_task.feedback
     )
 
 
 
 
 
-def submit_task(db: Session, task_id: int, user_id: int, submission_data: TaskSubmissionSchema) -> TaskSubmissionResponse:
+def submit_task(db: Session, task_id: int, user_id: int, submission_data: TaskSubmissionSchema) -> UserTaskResponse:
     """
     Submit labeled data for a specific task by a user.
     """
@@ -157,21 +163,15 @@ def submit_task(db: Session, task_id: int, user_id: int, submission_data: TaskSu
         email=user_task.user.email
     )
 
-    return TaskSubmissionResponse(
+    return UserTaskResponse(
         id=user_task.id,
-        task_id=task.id,
-        user_id=user_id,
+        task_id=user_task.task_id,
+        user_id=user_task.user_id,
         status=user_task.status,
-        labeled_data=user_task.labeled_data,  # Ensure this matches the model
+        labeled_data=user_task.labeled_data,
         submitted_at=user_task.submitted_at,
         review_status=user_task.review_status,
-        feedback=user_task.feedback,
-        task=TaskInfo(id=task.id, title=task.title, type=task.type),
-        user=UserInfo(
-            id=user_id,
-            username=db.query(User).filter(User.id == user_id).first().username,
-            email=db.query(User).filter(User.id == user_id).first().email
-        )
+        feedback=user_task.feedback
     )
 
 
@@ -223,8 +223,16 @@ def get_rejected_submissions(db: Session, user_id: int):
 
     return [
         TaskSubmissionResponse(
-            task={"id": task.task.id, "title": task.task.title, "type": task.task.type},
-            user={"id": user_id, "username": task.user.username, "email": task.user.email},
+            task={
+                "id": task.task.id,
+                "title": task.task.title,
+                "type": task.task.type
+            },
+            user={
+                "id": user_id,
+                "username": task.user.username,
+                "email": task.user.email
+            },
             status=task.status,
             labeled_data=task.labeled_data,
             submitted_at=task.submitted_at,
