@@ -24,6 +24,8 @@ MAX_RETRIES = 10
 
 
 
+
+
 def fetch_user_assigned_tasks(db: Session, user_id: int):
     user_tasks = db.query(UserTask).filter(UserTask.user_id == user_id).all()
 
@@ -121,47 +123,137 @@ def confirm_task(db: Session, task_id: int, user_id: int) -> UserTaskResponse:
 
 
 
+# def submit_task(db: Session, task_id: int, user_id: int, submission_data: TaskSubmissionSchema) -> UserTaskResponse:
+#     """
+#     Submit labeled data for a specific task by a user.
+#     """
+#     # Check if the task exists and assined to the user
+#     task = db.query(Task).filter(Task.id == task_id).first()
+#     if not task:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+#     # Check if the task is already submitted by the user
+#     user_task = db.query(UserTask).filter(UserTask.task_id == task_id, UserTask.user_id == user_id).first()
+#     if user_task and user_task.status == "submitted":
+#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Task already submitted by the user")
+
+#     # If the task hasn't been submitted yet, create or update the UserTask with submission details
+#     if not user_task:
+#         user_task = UserTask(
+#             task_id=task_id,
+#             user_id=user_id,
+#             status="submitted",
+#             labeled_data=submission_data.model_dump(),
+#             submitted_at=datetime.now(),
+#             review_status="pending"  # Assuming review is needed for the submission
+#         )
+#         db.add(user_task)
+#     else:
+#         # Update existing entry if it exists but wasn’t submitted yet
+#         user_task.status = "submitted"
+#         user_task.labeled_data = submission_data.model_dump()
+#         user_task.submitted_at = datetime.now()
+#         user_task.review_status = "pending"
+
+#     db.commit()
+#     db.refresh(user_task)
+
+#     issues = run_quality_check(user_task)
+
+
+#     if issues:
+#         user_task.review_status = "sys-rejected"
+#         user_task.status = "reviewed"
+#         user_task.feedback = "; ".join(issues)
+#     else:
+#         user_task.review_status = "sys-passed"
+#         user_task.status = "reviewed"
+#         user_task.feedback = None  # Clear any previous feedback
+
+#     db.commit()
+#     db.refresh(user_task)
+
+#     # Construct the TaskInfo and UserInfo fields
+#     task_info = TaskInfo(id=task.id, title=task.title, type=task.type)
+#     user_info = UserInfo(
+#         id=user_task.user.id,
+#         username=user_task.user.username,
+#         email=user_task.user.email
+#     )
+
+#     return UserTaskResponse(
+#         id=user_task.id,
+#         task_id=user_task.task_id,
+#         user_id=user_task.user_id,
+#         status=user_task.status,
+#         labeled_data=user_task.labeled_data,
+#         submitted_at=user_task.submitted_at,
+#         review_status=user_task.review_status,
+#         feedback=user_task.feedback
+#     )
 def submit_task(db: Session, task_id: int, user_id: int, submission_data: TaskSubmissionSchema) -> UserTaskResponse:
     """
     Submit labeled data for a specific task by a user.
     """
-    # Check if the task exists and assined to the user
+    # Check if the task exists
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
 
-    # Check if the task is already submitted by the user
-    user_task = db.query(UserTask).filter(UserTask.task_id == task_id, UserTask.user_id == user_id).first()
-    if user_task and user_task.status == "submitted":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Task already submitted by the user")
+    # Check if the task is assigned to the user
+    user_task = db.query(UserTask).filter(
+        UserTask.task_id == task_id,
+        UserTask.user_id == user_id
+    ).first()
 
-    # If the task hasn't been submitted yet, create or update the UserTask with submission details
     if not user_task:
-        user_task = UserTask(
-            task_id=task_id,
-            user_id=user_id,
-            status="submitted",
-            labeled_data=submission_data.model_dump(),
-            submitted_at=datetime.now(),
-            review_status="pending"  # Assuming review is needed for the submission
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Task not assigned to the user or has been dropped."
         )
-        db.add(user_task)
-    else:
-        # Update existing entry if it exists but wasn’t submitted yet
-        user_task.status = "submitted"
-        user_task.labeled_data = submission_data.model_dump()
-        user_task.submitted_at = datetime.now()
-        user_task.review_status = "pending"
+     # Prevent further submissions after successful submission
+    if user_task.review_status in ["sys-passed", "admin-approved"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You have already successfully submitted this task."
+        )
+
+    # Check submission counter limit
+    if user_task.submission_counter >= 5:
+        # Unassign the task and notify the user
+        db.delete(user_task)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maximum submission attempts reached. The task has been unassigned from you."
+        )
+
+    # Proceed with submission
+    user_task.status = "submitted"
+    user_task.labeled_data = submission_data.model_dump()
+    user_task.submitted_at = datetime.now()
+    user_task.review_status = "pending"
+
+    # Increment the submission counter
+    user_task.submission_counter += 1
 
     db.commit()
     db.refresh(user_task)
-    # Construct the TaskInfo and UserInfo fields
-    task_info = TaskInfo(id=task.id, title=task.title, type=task.type)
-    user_info = UserInfo(
-        id=user_task.user.id,
-        username=user_task.user.username,
-        email=user_task.user.email
-    )
+
+    # Run quality check
+    issues = run_quality_check(user_task)
+
+    if issues:
+        user_task.review_status = "sys-rejected"
+        user_task.status = "reviewed"
+        user_task.feedback = "; ".join(issues)
+    else:
+        user_task.review_status = "sys-passed"
+        user_task.status = "reviewed"
+        user_task.feedback = None  # Clear any previous feedback
+
+    db.commit()
+    db.refresh(user_task)
 
     return UserTaskResponse(
         id=user_task.id,
@@ -173,6 +265,32 @@ def submit_task(db: Session, task_id: int, user_id: int, submission_data: TaskSu
         review_status=user_task.review_status,
         feedback=user_task.feedback
     )
+
+
+def run_quality_check(submission: UserTask):
+    issues = []
+
+    # Ensure that the task relationship is loaded
+    task_type = submission.task.type.lower()
+
+    # The labeled_data is stored as a dictionary
+    data = submission.labeled_data.get("data", {})
+
+    if task_type == "classification":
+        if "label" in data and not data["label"].isalpha():
+            issues.append("Label contains invalid characters")
+    elif task_type == "object_detection":
+        bounding_boxes = data.get("bounding_boxes", [])
+        for box in bounding_boxes:
+            if box.get("width", 0) <= 0 or box.get("height", 0) <= 0:
+                issues.append("Bounding box dimensions cannot be zero or negative")
+            if not box.get("label", "").isalpha():
+                issues.append("Bounding box label contains invalid characters")
+
+    return issues
+
+
+
 
 
 def view_unassigned_tasks(db: Session):
@@ -223,20 +341,24 @@ def get_rejected_submissions(db: Session, user_id: int):
 
     return [
         TaskSubmissionResponse(
-            task={
-                "id": task.task.id,
-                "title": task.task.title,
-                "type": task.task.type
-            },
-            user={
-                "id": user_id,
-                "username": task.user.username,
-                "email": task.user.email
-            },
-            status=task.status,
-            labeled_data=task.labeled_data,
-            submitted_at=task.submitted_at,
-            review_status=task.review_status,
-            feedback=task.feedback
-        ) for task in rejected_submissions
+            id=submission.id,
+            task_id=submission.task_id,  # Include task_id
+            user_id=submission.user_id,  # Include user_id
+            status=submission.status,
+            labeled_data=submission.labeled_data,
+            submitted_at=submission.submitted_at,
+            review_status=submission.review_status,
+            feedback=submission.feedback,
+            task=TaskInfo(
+                id=submission.task.id,
+                title=submission.task.title,
+                type=submission.task.type
+            ),
+            user=UserInfo(
+                id=submission.user.id,
+                username=submission.user.username,
+                email=submission.user.email
+            )
+        )
+        for submission in rejected_submissions
     ]

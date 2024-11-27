@@ -124,6 +124,8 @@ class TaskSubmissionResponse(BaseModel):
     submitted_at: Optional[datetime]
     review_status: str
     feedback: Optional[str]
+    task : TaskInfo
+    user : UserInfo
 
     class Config:
         from_attributes = True

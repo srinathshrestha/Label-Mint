@@ -46,7 +46,7 @@ def create_task(db: Session, task_data: TaskCreate) -> TaskResponse:
         created_at=new_task.created_at
     )
 
-def edit_task(db: Session, task_id: int, task_data):
+def edit_task(db: Session, task_id: int, task_data: TaskCreate) -> TaskResponse:
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -55,6 +55,7 @@ def edit_task(db: Session, task_id: int, task_data):
     if existing_assignment:
         raise HTTPException(status_code=400, detail="Cannot edit a task that has already been assigned")
 
+    # Update the task fields
     task.title = task_data.title
     task.description = task_data.description
     task.image_url = task_data.image_url
@@ -62,7 +63,20 @@ def edit_task(db: Session, task_id: int, task_data):
     
     db.commit()
     db.refresh(task)
-    return task
+
+    # Convert to TaskResponse schema
+    return TaskResponse(
+        id=task.id,
+        task_id=task.id,
+        user_id=None,  # Assuming the task is unassigned after editing
+        status="unassigned",  # Default status for edited tasks
+        title=task.title,
+        description=task.description,
+        image_url=task.image_url,
+        type=task.type,
+        created_at=task.created_at
+    )
+
 
 # Continue similarly for other functions, importing schemas only inside the function as needed
 
@@ -141,13 +155,24 @@ def view_all_completed_submissions(db: Session):
 
     return [
         TaskSubmissionResponse(
-            task=TaskInfo(id=submission.task.id, title=submission.task.title, type=submission.task.type),
-            user=UserInfo(id=submission.user.id, username=submission.user.username, email=submission.user.email),
+            id=submission.id,
+            task_id=submission.task_id,
+            user_id=submission.user_id,
             status=submission.status,
             labeled_data=submission.labeled_data,
             submitted_at=submission.submitted_at,
             review_status=submission.review_status,
-            feedback=submission.feedback
+            feedback=submission.feedback,
+            task=TaskInfo(
+                id=submission.task.id,
+                title=submission.task.title,
+                type=submission.task.type
+            ),
+            user=UserInfo(
+                id=submission.user.id,
+                username=submission.user.username,
+                email=submission.user.email
+            )
         )
         for submission in submissions
     ]
@@ -165,6 +190,7 @@ def review_submission_action(db: Session, submission_id: int, review_action: Adm
     if review_action.action == "approve":
         submission.review_status = "admin-passed"
         submission.status = "reviewed"
+        submission.feedback = review_action.feedback or "Submission approved"
         
         # Issue tokens based on the task's reward amount
         task_reward = submission.task.token_reward

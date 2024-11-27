@@ -38,6 +38,7 @@ def admin_create_task(task_data: TaskCreate, db: Session = Depends(get_db), curr
 def admin_edit_task(task_id: int, task_data: TaskCreate, db: Session = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
     return edit_task(db, task_id, task_data)
 
+
 @router.delete("/tasks/{task_id}/delete", response_model=dict)
 def admin_delete_task(task_id: int, db: Session = Depends(get_db), current_admin: User = Depends(get_current_admin_user)):
     return delete_task(db, task_id)
